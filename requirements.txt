@@ -1,0 +1,6 @@
+customtkinter
+requests
+packaging
+pyinstaller
+Pillow
+sqlparse
