@@ -1,6 +1,6 @@
 # QueryTune
 
-QueryTune is a native macOS application designed to optimize SQL queries using Large Language Models (LLMs). It supports both **local models** (via Ollama) and **cloud services** (via OpenAI), providing developers and DBAs with a powerful tool to refactor SQL code, suggest indices, and improve database performance.
+QueryTune is a native macOS application designed to optimize SQL queries using Large Language Models (LLMs). It supports both **local models** (via Ollama) and **cloud services** (OpenAI API compatible), providing developers and DBAs with a powerful tool to refactor SQL code, suggest indices, and improve database performance.
 
 ## 🚀 Features
 
@@ -29,28 +29,50 @@ QueryTune is a native macOS application designed to optimize SQL queries using L
     - **Local:** Install [Ollama](https://ollama.com/) and pull a model (e.g., `ollama pull qwen2.5-coder:7b`).
     - **Cloud:** Obtain an API Key from [OpenAI](https://platform.openai.com/).
 2.  **Python & Tkinter:**
-    ```bash
+
+    ```
     brew install python@3.13 python-tk@3.13
     ```
 
 ### Development Setup
 
-1.  **Clone the repository and install dependencies:**
-    ```bash
+1.  **Clone the repository.**
+
+2.  **Create and activate a virtual environment (recommended):**
+
+    ```
+    python -m venv venv
+    source venv/bin/activate
+    ```
+
+3.  **Install dependencies:**
+
+    ```
     pip install -r requirements.txt
     ```
 
-2.  **Run the application:**
-    ```bash
+4.  **Run the application:**
+
+    ```
     python main.py
     ```
 
 ### Packaging for macOS
 
-To create a standalone `.app` and a `.dmg` installer:
+To create a standalone `.app` and a `.dmg` installer using the current environment:
 ```bash
 ./build_macos.sh
 ```
+
+
+## 🎶 Tuning
+
+### Model
+
+Choosing the LLM model is very important to obtain useful responses.
+The default model we suggest is qwen2.5-coder:7b
+Other useful LLM can be deepseek-r1:8b
+
 
 ## 🏗 Roadmap
 

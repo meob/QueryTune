@@ -21,11 +21,11 @@ else
 fi
 
 # 3. Run PyInstaller
-echo "Running PyInstaller..."
+echo "Running PyInstaller using $(python --version)..."
 pyinstaller --noconfirm --onedir --windowed \
     $ICON_ARG \
     --add-data "assets:assets" \
-    --add-data "$(python3 -c 'import customtkinter; print(customtkinter.__path__[0])'):customtkinter" \
+    --add-data "$(python -c 'import customtkinter; print(customtkinter.__path__[0])'):customtkinter" \
     --name "$APP_NAME" \
     "$MAIN_SCRIPT"
 
@@ -42,6 +42,9 @@ if command -v create-dmg &> /dev/null; then
     cp -r "dist/$APP_NAME.app" "$DMG_SOURCE/"
 
     mkdir -p dist/dmg
+    # Small sleep to ensure filesystem is settled
+    sleep 2
+    
     create-dmg \
         --volname "$APP_NAME Installer" \
         --window-pos 200 120 \
@@ -50,6 +53,7 @@ if command -v create-dmg &> /dev/null; then
         --icon "$APP_NAME.app" 200 190 \
         --hide-extension "$APP_NAME.app" \
         --app-drop-link 600 185 \
+        --no-internet-enable \
         "dist/$APP_NAME.dmg" \
         "$DMG_SOURCE/"
     

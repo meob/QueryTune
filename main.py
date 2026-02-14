@@ -8,6 +8,7 @@ import platform
 import os
 import sys
 import sqlparse
+import webbrowser
 from PIL import Image
 
 # Patch for macOS version detection issues on newer/beta releases (e.g., Sequoia, Tahoe)
@@ -26,13 +27,14 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.0.1"
+    VERSION = "0.0.2"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
     # AI Options
     AI_TEMPERATURE = 0.1
     AI_CTX_SIZE = 8192
+    DEFAULT_SYSTEM_PROMPT_CHAT = "You are an expert {db_type} DBA. Explain the query and suggest improvements."
     
     # UI 
     FONT_MONO = "Menlo"
@@ -55,7 +57,7 @@ class SettingsDialog(ctk.CTkToplevel):
         super().__init__(parent)
         self.parent = parent
         self.title("Preferences")
-        self.geometry("600x550")
+        self.geometry("600x600")
         self.resizable(False, False)
         
         # Make modal
@@ -73,6 +75,7 @@ class SettingsDialog(ctk.CTkToplevel):
         self.tabview.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         
         self.tab_ai = self.tabview.add("AI Configuration")
+        self.tab_prompts = self.tabview.add("System Prompt")
         self.tab_ui = self.tabview.add("Interface & Appearance")
         
         # --- AI Tab ---
@@ -105,6 +108,21 @@ class SettingsDialog(ctk.CTkToplevel):
         ctk.CTkLabel(self.tab_ai, text="Timeout (seconds):").grid(row=6, column=0, sticky="w", padx=10, pady=10)
         self.entry_timeout = ctk.CTkEntry(self.tab_ai)
         self.entry_timeout.grid(row=6, column=1, sticky="ew", padx=10, pady=10)
+
+        # --- Prompts Tab ---
+        self.tab_prompts.grid_columnconfigure(0, weight=1)
+        self.tab_prompts.grid_rowconfigure(2, weight=1)
+        
+        ctk.CTkLabel(self.tab_prompts, text="Chat Mode System Prompt:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=(10, 0))
+        ctk.CTkLabel(self.tab_prompts, text="Use {db_type} as placeholder for the selected database type.", font=ctk.CTkFont(size=11, slant="italic")).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 5))
+        
+        self.text_prompt_chat = ctk.CTkTextbox(self.tab_prompts, height=200)
+        self.text_prompt_chat.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+
+        self.btn_reset_prompt = ctk.CTkButton(self.tab_prompts, text="Reset to Default", 
+                                              command=self.reset_chat_prompt,
+                                              fg_color="#A04000", hover_color="#CA6F1E", width=120)
+        self.btn_reset_prompt.grid(row=3, column=0, sticky="e", padx=10, pady=(0, 10))
 
         # --- UI Tab ---
         self.tab_ui.grid_columnconfigure(1, weight=1)
@@ -167,6 +185,12 @@ class SettingsDialog(ctk.CTkToplevel):
         self.entry_font_sans.insert(0, s.get("font_sans", AppConfig.FONT_SANS))
         self.entry_size_query.insert(0, str(s.get("size_query", AppConfig.SIZE_QUERY)))
         self.entry_size_expl.insert(0, str(s.get("size_explanation", AppConfig.SIZE_EXPLANATION)))
+        
+        self.text_prompt_chat.insert("1.0", s.get("system_prompt_chat", AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT))
+
+    def reset_chat_prompt(self):
+        self.text_prompt_chat.delete("1.0", tk.END)
+        self.text_prompt_chat.insert("1.0", AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT)
 
     def save_settings(self):
         try:
@@ -184,7 +208,9 @@ class SettingsDialog(ctk.CTkToplevel):
             new_settings["font_mono"] = self.entry_font_mono.get().strip()
             new_settings["font_sans"] = self.entry_font_sans.get().strip()
             new_settings["size_query"] = int(self.entry_size_query.get())
-            new_settings["size_explanation"] = int(self.entry_size_expl.get())
+            new_settings["size_explanation"] = int(self.entry_size_explanation.get() if hasattr(self, "entry_size_explanation") else self.entry_size_expl.get())
+            
+            new_settings["system_prompt_chat"] = self.text_prompt_chat.get("1.0", tk.END).strip()
             
             # Apply to parent
             self.parent.apply_settings(new_settings)
@@ -192,6 +218,78 @@ class SettingsDialog(ctk.CTkToplevel):
             
         except ValueError as e:
             tk.messagebox.showerror("Invalid Input", f"Please check your inputs (numbers vs text).\nError: {e}")
+
+class HelpDialog(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("QueryTune Help & Usage")
+        self.geometry("600x650")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Text Area with unified background
+        box_bg_color = ("#FFFFFF", "#2B2B2B") # White in light mode, Dark Gray in dark mode
+        
+        self.text_frame = ctk.CTkFrame(self, fg_color=box_bg_color, border_width=1)
+        self.text_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+        
+        help_text = (
+            "QUICK START GUIDE\n"
+            "-----------------\n"
+            "1. Start Ollama: Ensure Ollama is running (`ollama serve`).\n"
+            "2. Select Model: Enter the model name (e.g., qwen2.5-coder:7b).\n"
+            "3. Database: Select the target SQL dialect for better optimization.\n\n"
+            
+            "ANALYSIS MODES\n"
+            "--------------\n"
+            "• OPTIMIZE: Best for refactoring. Generates structured JSON output with "
+            "the optimized query, required indices, and a technical explanation.\n"
+            "• CHAT MODE: Best for exploration. Provides a natural language "
+            "analysis of the query in real-time (streaming).\n\n"
+            
+            "ADVANCED FEATURES\n"
+            "-----------------\n"
+            "• CONTEXT BOX: Use this to provide the AI with extra info like:\n"
+            "  - Table sizes (e.g., 'Table ACME has 1M rows')\n"
+            "  - Constraints (e.g., 'Do not use JOINs')\n"
+            "  - Existing Indices or Schema details.\n"
+            "• PREFERENCES: Access via CMD+, (macOS) to change UI fonts, "
+            "Ollama URL, Temperature, and Timeout settings.\n\n"
+            
+            "DISTRIBUTION NOTE\n"
+            "-----------------\n"
+            "If sharing this app, users may need to Right-Click -> Open the first time "
+            "to bypass macOS security warnings for unsigned developers.\n\n"
+            
+            "GITHUB & UPDATES\n"
+            "----------------\n"
+            "Report bugs or contribute at:"
+        )
+
+        self.textbox = ctk.CTkTextbox(self.text_frame, 
+                                      font=(AppConfig.FONT_SANS, 13), 
+                                      wrap="word",
+                                      fg_color="transparent",
+                                      scrollbar_button_color=("#C0C0C0", "#505050"))
+        self.textbox.pack(fill="both", expand=True, padx=10, pady=(10, 0))
+        self.textbox.insert("1.0", help_text)
+        self.textbox.configure(state="disabled")
+
+        # GitHub Link inside the same white/dark box
+        self.link_label = ctk.CTkLabel(self.text_frame, text="https://github.com/meob/QueryTune", 
+                                      text_color="#3498DB", cursor="hand2",
+                                      fg_color="transparent",
+                                      font=ctk.CTkFont(size=13, underline=True),
+                                      anchor="w")
+        self.link_label.pack(fill="x", padx=15, pady=(0, 15))
+        self.link_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/meob/QueryTune"))
+
+        self.btn_close = ctk.CTkButton(self, text="Close", command=self.destroy)
+        self.btn_close.grid(row=1, column=0, pady=(0, 20))
 
 class QueryTuneApp(ctk.CTk):
     def __init__(self):
@@ -210,7 +308,8 @@ class QueryTuneApp(ctk.CTk):
             "font_sans": AppConfig.FONT_SANS,
             "size_query": AppConfig.SIZE_QUERY,
             "size_indices": AppConfig.SIZE_INDICES,
-            "size_explanation": AppConfig.SIZE_EXPLANATION
+            "size_explanation": AppConfig.SIZE_EXPLANATION,
+            "system_prompt_chat": AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT
         }
 
         self.current_optimization_id = 0
@@ -266,40 +365,7 @@ class QueryTuneApp(ctk.CTk):
         )
 
     def show_help(self):
-        help_text = (
-            "QUICK START GUIDE\n"
-            "-----------------\n"
-            "1. Start Ollama: Ensure Ollama is running (`ollama serve`).\n"
-            "2. Select Model: Enter the model name (e.g., qwen2.5-coder:7b).\n"
-            "3. Database: Select the target SQL dialect for better optimization.\n\n"
-            
-            "ANALYSIS MODES\n"
-            "--------------\n"
-            "• OPTIMIZE: Best for refactoring. Generates structured JSON output with "
-            "the optimized query, required indices, and a technical explanation.\n"
-            "• CHAT MODE: Best for exploration. Provides a natural language "
-            "analysis of the query in real-time (streaming).\n\n"
-            
-            "ADVANCED FEATURES\n"
-            "-----------------\n"
-            "• CONTEXT BOX: Use this to provide the AI with extra info like:\n"
-            "  - Table sizes (e.g., 'Table ACME has 1M rows')\n"
-            "  - Constraints (e.g., 'Do not use JOINs')\n"
-            "  - Existing Indices or Schema details.\n"
-            "• PREFERENCES: Access via CMD+, (macOS) to change UI fonts, "
-            "Ollama URL, Temperature, and Timeout settings.\n\n"
-            
-            "DISTRIBUTION NOTE\n"
-            "-----------------\n"
-            "If sharing this app, users may need to Right-Click -> Open the first time "
-            "to bypass macOS security warnings for unsigned developers.\n\n"
-            
-            "GITHUB & UPDATES\n"
-            "----------------\n"
-            "Report bugs or contribute at:\n"
-            "https://github.com/meob/QueryTune"
-        )
-        messagebox.showinfo("QueryTune Help & Usage", help_text)
+        HelpDialog(self)
     
     def _init_sidebar(self):
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
@@ -350,8 +416,13 @@ class QueryTuneApp(ctk.CTk):
         self.input_label = ctk.CTkLabel(self.header_frame, text="Paste your SQL Query here:", font=ctk.CTkFont(weight="bold"))
         self.input_label.pack(side="left")
         
-        self.context_switch = ctk.CTkSwitch(self.header_frame, text="Show Context / Instructions", command=self.toggle_context)
+        self.context_switch = ctk.CTkSwitch(self.header_frame, text="Show Context window", command=self.toggle_context)
         self.context_switch.pack(side="right")
+
+        self.format_button = ctk.CTkButton(self.header_frame, text="Format SQL", 
+                                           command=self.format_input_query,
+                                           width=80, height=24, font=ctk.CTkFont(size=12))
+        self.format_button.pack(side="right", padx=10)
 
         # Input Query
         self.input_text = ctk.CTkTextbox(self.main_frame, undo=True, font=(AppConfig.FONT_MONO, AppConfig.SIZE_QUERY))
@@ -427,6 +498,15 @@ class QueryTuneApp(ctk.CTk):
             self.context_frame.grid_forget()
             self.main_frame.grid_rowconfigure(1, weight=2) # Input grows back
 
+    def format_input_query(self):
+        query = self.input_text.get("1.0", tk.END).strip()
+        if query:
+            try:
+                formatted_sql = sqlparse.format(query, reindent=True, keyword_case='upper')
+                self.input_text.delete("1.0", tk.END)
+                self.input_text.insert("1.0", formatted_sql)
+            except Exception as e:
+                print(f"Format error: {e}")
 
     def change_appearance_mode_event(self, new_appearance_mode: str):
         ctk.set_appearance_mode(new_appearance_mode)
@@ -550,7 +630,8 @@ class QueryTuneApp(ctk.CTk):
             format_type = {"type": "json_object"} if "openai" in url.lower() else "json"
             stream = False
         else:
-            system_prompt = f"You are an expert {db_type} DBA. Explain the query and suggest improvements."
+            system_prompt_template = self.settings.get("system_prompt_chat", AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT)
+            system_prompt = system_prompt_template.replace("{db_type}", db_type)
             user_content = f"Input Query: {query}\nContext: {context}"
             format_type = ""
             stream = True
