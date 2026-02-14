@@ -67,12 +67,21 @@ To create a standalone `.app` and a `.dmg` installer using the current environme
 
 ## 🎶 Tuning
 
-### Model
+### Recommended Models
 
-Choosing the LLM model is very important to obtain useful responses.
-The default model we suggest is qwen2.5-coder:7b
-Other useful LLM can be deepseek-r1:8b
+Choosing the right LLM is crucial for high-quality optimizations. Below are the tested models compatible with QueryTune:
 
+| Model Name (Ollama/API) | Local | Best For | Suggested Temp |
+| :--- | :---: | :--- | :---: |
+| `qwen2.5-coder:7b` | **X** | **Default.** Balanced speed and excellent SQL logic. | 0.1 |
+| `deepseek-r1:8b` | **X** | Reasoning-based analysis. Great for explanations. | 0.6 |
+| `deepseek-r1:14b` | **X** | High-quality reasoning for complex multi-join queries. | 0.6 |
+| `gpt-4o` | | Cloud-based, very fast and reliable generalist. | 0.0 |
+| `claude-3-5-sonnet` | | Exceptional at following complex refactoring rules. | 0.0 |
+
+> **Pro Tip:** For SQL optimization, always keep the temperature low (0.0 - 0.2) to ensure syntactic correctness, except for "Reasoning" models like DeepSeek-R1 which perform better with slightly higher temperature.
+
+---
 
 ## 🏗 Roadmap
 
