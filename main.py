@@ -94,8 +94,15 @@ class SettingsDialog(ctk.CTkToplevel):
         self.entry_apikey.grid(row=2, column=1, sticky="ew", padx=10, pady=10)
         
         ctk.CTkLabel(self.tab_ai, text="Model Name:").grid(row=3, column=0, sticky="w", padx=10, pady=10)
-        self.entry_model = ctk.CTkEntry(self.tab_ai)
-        self.entry_model.grid(row=3, column=1, sticky="ew", padx=10, pady=10)
+        self.model_frame = ctk.CTkFrame(self.tab_ai, fg_color="transparent")
+        self.model_frame.grid(row=3, column=1, sticky="ew", padx=10, pady=10)
+        self.model_frame.grid_columnconfigure(0, weight=1)
+        
+        self.entry_model = ctk.CTkComboBox(self.model_frame, values=[AppConfig.DEFAULT_MODEL])
+        self.entry_model.grid(row=0, column=0, sticky="ew")
+        
+        self.btn_fetch = ctk.CTkButton(self.model_frame, text="↻", width=30, command=self.fetch_ollama_models)
+        self.btn_fetch.grid(row=0, column=1, padx=(5, 0))
         
         ctk.CTkLabel(self.tab_ai, text="Temperature (0.0 - 1.0):").grid(row=4, column=0, sticky="w", padx=10, pady=10)
         self.entry_temp = ctk.CTkEntry(self.tab_ai)
@@ -161,13 +168,39 @@ class SettingsDialog(ctk.CTkToplevel):
         if choice == "Ollama (Local)":
             self.entry_url.delete(0, tk.END)
             self.entry_url.insert(0, "http://localhost:11434/v1/chat/completions")
-            self.entry_model.delete(0, tk.END)
-            self.entry_model.insert(0, "qwen2.5-coder:7b")
+            # Restore available models from settings if they look like Ollama models
+            models = self.parent.settings.get("available_models", [AppConfig.DEFAULT_MODEL])
+            self.entry_model.configure(values=models)
+            self.entry_model.set("qwen2.5-coder:7b")
         elif choice == "OpenAI (Cloud)":
             self.entry_url.delete(0, tk.END)
             self.entry_url.insert(0, "https://api.openai.com/v1/chat/completions")
-            self.entry_model.delete(0, tk.END)
-            self.entry_model.insert(0, "gpt-4o")
+            openai_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+            self.entry_model.configure(values=openai_models)
+            self.entry_model.set("gpt-4o")
+
+    def fetch_ollama_models(self):
+        url = self.entry_url.get().strip()
+        if "localhost" in url or "127.0.0.1" in url or "/api/" in url or ":11434" in url:
+            try:
+                import re
+                base_url = re.sub(r'/v1/.*', '', url)
+                if not base_url.endswith("/api/tags"):
+                    base_url = base_url.rstrip("/") + "/api/tags"
+                
+                response = requests.get(base_url, timeout=5)
+                response.raise_for_status()
+                data = response.json()
+                models = [m["name"] for m in data.get("models", [])]
+                if models:
+                    self.entry_model.configure(values=models)
+                    self.entry_model.set(models[0])
+                else:
+                    tk.messagebox.showinfo("Ollama", "No models found on this Ollama instance.")
+            except Exception as e:
+                tk.messagebox.showerror("Error", f"Could not fetch models from Ollama: {e}")
+        else:
+            tk.messagebox.showinfo("Notice", "Model fetching is only available for local Ollama instances.")
 
     def load_current_values(self):
         s = self.parent.settings
@@ -175,7 +208,12 @@ class SettingsDialog(ctk.CTkToplevel):
         self.option_provider.set("Custom") # Default to custom as we don't save provider state yet
         self.entry_url.insert(0, s.get("ollama_url", AppConfig.OLLAMA_URL))
         self.entry_apikey.insert(0, s.get("api_key", ""))
-        self.entry_model.insert(0, s.get("model", AppConfig.DEFAULT_MODEL))
+        
+        # Load available models into the combobox
+        models = s.get("available_models", [AppConfig.DEFAULT_MODEL])
+        self.entry_model.configure(values=models)
+        self.entry_model.set(s.get("model", AppConfig.DEFAULT_MODEL))
+        
         self.entry_temp.insert(0, str(s.get("temperature", AppConfig.AI_TEMPERATURE)))
         self.entry_ctx.insert(0, str(s.get("ctx_size", AppConfig.AI_CTX_SIZE)))
         self.entry_timeout.insert(0, str(s.get("timeout", AppConfig.TIMEOUT)))
@@ -211,6 +249,8 @@ class SettingsDialog(ctk.CTkToplevel):
             new_settings["size_explanation"] = int(self.entry_size_explanation.get() if hasattr(self, "entry_size_explanation") else self.entry_size_expl.get())
             
             new_settings["system_prompt_chat"] = self.text_prompt_chat.get("1.0", tk.END).strip()
+            # Save the current list of values from the combobox
+            new_settings["available_models"] = self.entry_model.cget("values")
             
             # Apply to parent
             self.parent.apply_settings(new_settings)
@@ -309,7 +349,8 @@ class QueryTuneApp(ctk.CTk):
             "size_query": AppConfig.SIZE_QUERY,
             "size_indices": AppConfig.SIZE_INDICES,
             "size_explanation": AppConfig.SIZE_EXPLANATION,
-            "system_prompt_chat": AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT
+            "system_prompt_chat": AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT,
+            "available_models": [AppConfig.DEFAULT_MODEL]
         }
 
         self.current_optimization_id = 0
@@ -390,8 +431,8 @@ class QueryTuneApp(ctk.CTk):
 
         self.model_label = ctk.CTkLabel(self.sidebar_frame, text="Model:", anchor="w")
         self.model_label.grid(row=4, column=0, padx=20, pady=(10, 0))
-        self.model_entry = ctk.CTkEntry(self.sidebar_frame, placeholder_text=AppConfig.DEFAULT_MODEL)
-        self.model_entry.insert(0, AppConfig.DEFAULT_MODEL)
+        self.model_entry = ctk.CTkComboBox(self.sidebar_frame, values=[AppConfig.DEFAULT_MODEL])
+        self.model_entry.set(AppConfig.DEFAULT_MODEL)
         self.model_entry.grid(row=5, column=0, padx=20, pady=10)
 
         self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Appearance:", anchor="w")
@@ -465,7 +506,7 @@ class QueryTuneApp(ctk.CTk):
         self.tabview.grid(row=4, column=0, sticky="nsew")
         self.tabview.add("Optimized Query")
         self.tabview.add("Index Suggestions")
-        self.tabview.add("Explanation")
+        self.tabview.add("Analysis")
 
         self.output_query = ctk.CTkTextbox(self.tabview.tab("Optimized Query"), font=(AppConfig.FONT_MONO, AppConfig.SIZE_QUERY))
         self.output_query.pack(fill="both", expand=True, padx=5, pady=5)
@@ -479,9 +520,9 @@ class QueryTuneApp(ctk.CTk):
                                               command=lambda: self.copy_to_clipboard(self.output_indices.get("1.0", tk.END)))
         self.copy_indices_btn.pack(pady=5)
 
-        self.output_explanation = ctk.CTkTextbox(self.tabview.tab("Explanation"), font=(AppConfig.FONT_SANS, AppConfig.SIZE_EXPLANATION), wrap="word")
+        self.output_explanation = ctk.CTkTextbox(self.tabview.tab("Analysis"), font=(AppConfig.FONT_SANS, AppConfig.SIZE_EXPLANATION), wrap="word")
         self.output_explanation.pack(fill="both", expand=True, padx=5, pady=5)
-        self.copy_expl_btn = ctk.CTkButton(self.tabview.tab("Explanation"), text="Copy Explanation", 
+        self.copy_expl_btn = ctk.CTkButton(self.tabview.tab("Analysis"), text="Copy Analysis", 
                                            command=lambda: self.copy_to_clipboard(self.output_explanation.get("1.0", tk.END)))
         self.copy_expl_btn.pack(pady=5)
 
@@ -541,8 +582,11 @@ class QueryTuneApp(ctk.CTk):
         
         # Update Sidebar
         self.db_optionemenu.set(s.get("db_type", AppConfig.DB_OPTIONS[0]))
-        self.model_entry.delete(0, tk.END)
-        self.model_entry.insert(0, s.get("model", AppConfig.DEFAULT_MODEL))
+        
+        # Update Model List and Current Value
+        models = s.get("available_models", [AppConfig.DEFAULT_MODEL])
+        self.model_entry.configure(values=models)
+        self.model_entry.set(s.get("model", AppConfig.DEFAULT_MODEL))
         
         mode = s.get("appearance", "System")
         self.appearance_mode_optionemenu.set(mode)
@@ -588,7 +632,7 @@ class QueryTuneApp(ctk.CTk):
             self.tabview.set("Optimized Query")
         else:
             self.output_explanation.insert("1.0", "Chatting with DBA... \n\n")
-            self.tabview.set("Explanation")
+            self.tabview.set("Analysis")
 
         self.current_optimization_id += 1
         self.is_optimizing = True
