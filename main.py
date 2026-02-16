@@ -539,11 +539,76 @@ class QueryTuneApp(ctk.CTk):
             self.context_frame.grid_forget()
             self.main_frame.grid_rowconfigure(1, weight=2) # Input grows back
 
+    def align_sql_keywords(self, sql):
+        """Advanced post-processing for soft right-alignment using nesting levels"""
+        import re
+        
+        # Offsets to achieve end-alignment at column 6 (length of SELECT)
+        # These are used as 'base + offset'
+        offsets = {
+            'FROM': 2, 'JOIN': 2, 'LEFT': 2, 'RIGHT': 2, 'INNER': 2,
+            'WHERE': 1, 'AND': 3, 'OR': 4, 'ON': 4,
+            'GROUP': 1, 'ORDER': 1, 'HAVING': 1, 'LIMIT': 1,
+            'SET': 3, 'VALUES': 0, 'INSERT': 0, 'UPDATE': 0, 'DELETE': 0
+        }
+        
+        lines = sql.split('\n')
+        aligned_lines = []
+        nesting_level = 0
+        
+        for line in lines:
+            stripped = line.lstrip()
+            if not stripped:
+                aligned_lines.append("")
+                continue
+                
+            # Detect subquery start/end
+            is_subquery_start = stripped.startswith('(') and 'SELECT' in stripped.upper()
+            
+            # If the line starts with a closing paren, we are exiting a level
+            if stripped.startswith(')'):
+                nesting_level = max(0, nesting_level - 1)
+            
+            # Base indentation: 2 spaces per level + 1 'bonus' space for each level 
+            # to align with the '(' in "(SELECT"
+            current_base = (nesting_level * 2) + nesting_level
+            
+            # Get the first word (handling the starting '(' for subqueries)
+            first_word = stripped.split()[0].upper().replace('(', '')
+            
+            if is_subquery_start:
+                # Anchor the subquery (e.g., at col 2, 5, 8...)
+                new_indent = (nesting_level * 3) + 2
+                new_line = (" " * new_indent) + stripped
+                # If the subquery doesn't close on the same line, increment level
+                if ')' not in stripped:
+                    nesting_level += 1
+            elif first_word in offsets:
+                new_indent = current_base + offsets[first_word]
+                new_line = (" " * new_indent) + stripped
+            elif first_word == 'SELECT':
+                new_line = (" " * current_base) + stripped
+            else:
+                # Continuation line (columns, table lists, etc.)
+                # Align 1 space after the 'SELECT' anchor
+                new_indent = current_base + 7
+                new_line = (" " * new_indent) + stripped
+            
+            # If a closing paren is present but not at the start, 
+            # it might be closing the current level
+            if ')' in stripped and not stripped.startswith(')'):
+                nesting_level = max(0, nesting_level - stripped.count(')'))
+                
+            aligned_lines.append(new_line)
+            
+        return '\n'.join(aligned_lines)
+
     def format_input_query(self):
         query = self.input_text.get("1.0", tk.END).strip()
         if query:
             try:
                 formatted_sql = sqlparse.format(query, reindent=True, keyword_case='upper')
+                formatted_sql = self.align_sql_keywords(formatted_sql)
                 self.input_text.delete("1.0", tk.END)
                 self.input_text.insert("1.0", formatted_sql)
             except Exception as e:
@@ -781,6 +846,7 @@ class QueryTuneApp(ctk.CTk):
         raw_sql = content.get("optimized_query", "")
         try:
             formatted_sql = sqlparse.format(raw_sql, reindent=True, keyword_case='upper')
+            formatted_sql = self.align_sql_keywords(formatted_sql)
         except Exception:
             formatted_sql = raw_sql
         self.output_query.insert("1.0", formatted_sql if formatted_sql else "No query returned")
