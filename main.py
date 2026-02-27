@@ -34,7 +34,7 @@ class AppConfig:
     # AI Options
     AI_TEMPERATURE = 0.1
     AI_CTX_SIZE = 8192
-    DEFAULT_SYSTEM_PROMPT_CHAT = "You are an expert {db_type} DBA. Explain the query and suggest improvements."
+    DEFAULT_SYSTEM_PROMPT_CHAT = "You are an expert {db_type} DBA. Explain the query and suggest improvements. Reply in English."
     
     # UI 
     FONT_MONO = "Menlo"
