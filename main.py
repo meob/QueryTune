@@ -27,7 +27,7 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.0.2"
+    VERSION = "0.0.3"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
@@ -42,6 +42,12 @@ class AppConfig:
     SIZE_QUERY = 10      # Smaller for long queries
     SIZE_INDICES = 12    # Standard mono
     SIZE_EXPLANATION = 16 # Larger for readability
+
+    # SQL Formatting Defaults
+    SQL_COMMA_FIRST = False
+    SQL_INDENT_WIDTH = 2
+    SQL_KEYWORD_CASE = "upper"
+    SQL_COMPACT_SELECT = False
     
     DB_OPTIONS = ["PostgreSQL", "MySQL", "SQLite", "ClickHouse", "Standard SQL", "Oracle", "MS SQL Server"]
     # We switch to the standard Chat Completion endpoint which is compatible with both Ollama and OpenAI
@@ -116,6 +122,10 @@ class SettingsDialog(ctk.CTkToplevel):
         self.entry_timeout = ctk.CTkEntry(self.tab_ai)
         self.entry_timeout.grid(row=6, column=1, sticky="ew", padx=10, pady=10)
 
+        self.btn_test_conn = ctk.CTkButton(self.tab_ai, text="Test Connection", command=self.test_connection, 
+                                          fg_color="#2E86C1", hover_color="#2874A6")
+        self.btn_test_conn.grid(row=7, column=1, sticky="e", padx=10, pady=10)
+
         # --- Prompts Tab ---
         self.tab_prompts.grid_columnconfigure(0, weight=1)
         self.tab_prompts.grid_rowconfigure(2, weight=1)
@@ -146,13 +156,34 @@ class SettingsDialog(ctk.CTkToplevel):
         self.entry_font_sans = ctk.CTkEntry(self.tab_ui)
         self.entry_font_sans.grid(row=2, column=1, sticky="ew", padx=10, pady=10)
         
-        ctk.CTkLabel(self.tab_ui, text="Query Font Size:").grid(row=3, column=0, sticky="w", padx=10, pady=10)
+        ctk.CTkLabel(self.tab_ui, text="Query Font Size:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
         self.entry_size_query = ctk.CTkEntry(self.tab_ui)
-        self.entry_size_query.grid(row=3, column=1, sticky="ew", padx=10, pady=10)
+        self.entry_size_query.grid(row=3, column=1, sticky="ew", padx=10, pady=5)
         
-        ctk.CTkLabel(self.tab_ui, text="Explanation Font Size:").grid(row=4, column=0, sticky="w", padx=10, pady=10)
+        ctk.CTkLabel(self.tab_ui, text="Explanation Font Size:").grid(row=4, column=0, sticky="w", padx=10, pady=5)
         self.entry_size_expl = ctk.CTkEntry(self.tab_ui)
-        self.entry_size_expl.grid(row=4, column=1, sticky="ew", padx=10, pady=10)
+        self.entry_size_expl.grid(row=4, column=1, sticky="ew", padx=10, pady=5)
+
+        # SQL Formatting Frame
+        self.format_frame = ctk.CTkFrame(self.tab_ui)
+        self.format_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        self.format_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(self.format_frame, text="SQL Formatting Preferences", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, pady=5)
+
+        ctk.CTkLabel(self.format_frame, text="Keyword Case:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        self.option_keyword_case = ctk.CTkOptionMenu(self.format_frame, values=["UPPER", "lower", "Capitalize"])
+        self.option_keyword_case.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(self.format_frame, text="Indent:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        self.option_indent_width = ctk.CTkOptionMenu(self.format_frame, values=["2 Spaces", "4 Spaces", "8 Spaces"])
+        self.option_indent_width.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
+
+        self.switch_comma_first = ctk.CTkSwitch(self.format_frame, text="Comma-First Style (, col)")
+        self.switch_comma_first.grid(row=3, column=0, columnspan=2, sticky="w", padx=10, pady=5)
+
+        self.switch_compact_select = ctk.CTkSwitch(self.format_frame, text="Compact SELECT (One line)")
+        self.switch_compact_select.grid(row=4, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
         # --- Buttons ---
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -178,6 +209,36 @@ class SettingsDialog(ctk.CTkToplevel):
             openai_models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
             self.entry_model.configure(values=openai_models)
             self.entry_model.set("gpt-4o")
+
+    def test_connection(self):
+        url = self.entry_url.get().strip()
+        api_key = self.entry_apikey.get().strip()
+        model = self.entry_model.get().strip()
+        
+        def run_test():
+            self.btn_test_conn.configure(state="disabled", text="Testing...")
+            try:
+                headers = {"Content-Type": "application/json"}
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
+                
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": "say ok"}],
+                    "max_tokens": 5
+                }
+                
+                response = requests.post(url, json=payload, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    tk.messagebox.showinfo("Success", "Connection successful!")
+                else:
+                    tk.messagebox.showerror("Error", f"Server returned status {response.status_code}: {response.text}")
+            except Exception as e:
+                tk.messagebox.showerror("Error", f"Connection failed: {e}")
+            finally:
+                self.btn_test_conn.configure(state="normal", text="Test Connection")
+
+        threading.Thread(target=run_test, daemon=True).start()
 
     def fetch_ollama_models(self):
         url = self.entry_url.get().strip()
@@ -224,6 +285,18 @@ class SettingsDialog(ctk.CTkToplevel):
         self.entry_size_query.insert(0, str(s.get("size_query", AppConfig.SIZE_QUERY)))
         self.entry_size_expl.insert(0, str(s.get("size_explanation", AppConfig.SIZE_EXPLANATION)))
         
+        # New Formatting Settings
+        kw_case = s.get("sql_keyword_case", AppConfig.SQL_KEYWORD_CASE)
+        if kw_case == "upper": self.option_keyword_case.set("UPPER")
+        elif kw_case == "lower": self.option_keyword_case.set("lower")
+        else: self.option_keyword_case.set("Capitalize")
+        
+        self.option_indent_width.set(f"{s.get('sql_indent_width', AppConfig.SQL_INDENT_WIDTH)} Spaces")
+        if s.get("sql_comma_first", AppConfig.SQL_COMMA_FIRST):
+            self.switch_comma_first.select()
+        if s.get("sql_compact_select", AppConfig.SQL_COMPACT_SELECT):
+            self.switch_compact_select.select()
+
         self.text_prompt_chat.insert("1.0", s.get("system_prompt_chat", AppConfig.DEFAULT_SYSTEM_PROMPT_CHAT))
 
     def reset_chat_prompt(self):
@@ -246,8 +319,14 @@ class SettingsDialog(ctk.CTkToplevel):
             new_settings["font_mono"] = self.entry_font_mono.get().strip()
             new_settings["font_sans"] = self.entry_font_sans.get().strip()
             new_settings["size_query"] = int(self.entry_size_query.get())
-            new_settings["size_explanation"] = int(self.entry_size_explanation.get() if hasattr(self, "entry_size_explanation") else self.entry_size_expl.get())
+            new_settings["size_explanation"] = int(self.entry_size_expl.get())
             
+            # New Formatting Settings
+            new_settings["sql_keyword_case"] = self.option_keyword_case.get().lower()
+            new_settings["sql_indent_width"] = int(self.option_indent_width.get().split()[0])
+            new_settings["sql_comma_first"] = self.switch_comma_first.get() == 1
+            new_settings["sql_compact_select"] = self.switch_compact_select.get() == 1
+
             new_settings["system_prompt_chat"] = self.text_prompt_chat.get("1.0", tk.END).strip()
             # Save the current list of values from the combobox
             new_settings["available_models"] = self.entry_model.cget("values")
@@ -542,9 +621,13 @@ class QueryTuneApp(ctk.CTk):
     def align_sql_keywords(self, sql):
         """Advanced post-processing for soft right-alignment using nesting levels"""
         import re
-        
+        s = self.settings
+        indent_width = s.get("sql_indent_width", 2)
+        compact_select = s.get("sql_compact_select", False)
+
         # Offsets to achieve end-alignment at column 6 (length of SELECT)
-        # These are used as 'base + offset'
+        # adjusted based on indent_width if needed, but usually 
+        # relative to the SELECT anchor.
         offsets = {
             'FROM': 2, 'JOIN': 2, 'LEFT': 2, 'RIGHT': 2, 'INNER': 2,
             'WHERE': 1, 'AND': 3, 'OR': 4, 'ON': 4,
@@ -553,6 +636,29 @@ class QueryTuneApp(ctk.CTk):
         }
         
         lines = sql.split('\n')
+        
+        # Compact SELECT logic: if enabled, try to join lines between SELECT and next keyword
+        if compact_select:
+            new_lines = []
+            buf = []
+            in_select = False
+            for line in lines:
+                up = line.strip().upper()
+                if up.startswith('SELECT'):
+                    in_select = True
+                    buf.append(line.strip())
+                elif in_select and any(up.startswith(k) for k in offsets):
+                    new_lines.append(" ".join(buf))
+                    buf = [line]
+                    in_select = False
+                elif in_select:
+                    buf.append(line.strip())
+                else:
+                    new_lines.append(line)
+            if buf:
+                new_lines.append(" ".join(buf) if in_select else buf[0])
+            lines = new_lines
+
         aligned_lines = []
         nesting_level = 0
         
@@ -569,18 +675,15 @@ class QueryTuneApp(ctk.CTk):
             if stripped.startswith(')'):
                 nesting_level = max(0, nesting_level - 1)
             
-            # Base indentation: 2 spaces per level + 1 'bonus' space for each level 
-            # to align with the '(' in "(SELECT"
-            current_base = (nesting_level * 2) + nesting_level
+            # Base indentation
+            current_base = nesting_level * (indent_width + 1)
             
             # Get the first word (handling the starting '(' for subqueries)
             first_word = stripped.split()[0].upper().replace('(', '')
             
             if is_subquery_start:
-                # Anchor the subquery (e.g., at col 2, 5, 8...)
-                new_indent = (nesting_level * 3) + 2
+                new_indent = (nesting_level * (indent_width + 1)) + indent_width
                 new_line = (" " * new_indent) + stripped
-                # If the subquery doesn't close on the same line, increment level
                 if ')' not in stripped:
                     nesting_level += 1
             elif first_word in offsets:
@@ -589,13 +692,10 @@ class QueryTuneApp(ctk.CTk):
             elif first_word == 'SELECT':
                 new_line = (" " * current_base) + stripped
             else:
-                # Continuation line (columns, table lists, etc.)
-                # Align 1 space after the 'SELECT' anchor
+                # Continuation line
                 new_indent = current_base + 7
                 new_line = (" " * new_indent) + stripped
             
-            # If a closing paren is present but not at the start, 
-            # it might be closing the current level
             if ')' in stripped and not stripped.startswith(')'):
                 nesting_level = max(0, nesting_level - stripped.count(')'))
                 
@@ -607,7 +707,14 @@ class QueryTuneApp(ctk.CTk):
         query = self.input_text.get("1.0", tk.END).strip()
         if query:
             try:
-                formatted_sql = sqlparse.format(query, reindent=True, keyword_case='upper')
+                s = self.settings
+                formatted_sql = sqlparse.format(
+                    query, 
+                    reindent=True, 
+                    keyword_case=s.get("sql_keyword_case", "upper"),
+                    indent_width=s.get("sql_indent_width", 2),
+                    comma_first=s.get("sql_comma_first", False)
+                )
                 formatted_sql = self.align_sql_keywords(formatted_sql)
                 self.input_text.delete("1.0", tk.END)
                 self.input_text.insert("1.0", formatted_sql)
