@@ -20,7 +20,7 @@
 
 QueryTune uses the native MacOS user inferface. One picture is worth a thousand words:
 
-<img alt="QueryTune User Interface" src="assets/QTune_UI.png" width="50%">
+<img alt="QueryTune User Interface" src="assets/QTune_UI.webp" width="50%">
 
 In Chat Mode QueryTune can describe the results in any language the LLM knows.
 
@@ -113,9 +113,10 @@ Choosing the right LLM is crucial for high-quality optimizations. Below are the 
 
 ## 🏗 Roadmap
 
-- [ ] **DDL Integration:** Automatic schema parsing from SQL files to provide even more context.
-- [ ] **History Log:** Save and browse previous optimizations.
+- [x] **History Log:** Save and browse previous optimizations.
+- [ ] **DDL Integration:** Automatic schema parsing from SQL files to provide even more context. (NB The context window seems enough)
 - [ ] **Visual Diff:** Side-by-side comparison between original and optimized queries.
+- [ ] **Database connection:** Online DB connection to gather more information. 
 
 ## 📄 License
 

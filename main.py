@@ -8,6 +8,8 @@ import platform
 import os
 import sys
 import sqlparse
+import sqlite3
+from datetime import datetime
 import webbrowser
 from PIL import Image
 
@@ -27,7 +29,7 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.0.3"
+    VERSION = "0.1.0"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
@@ -53,6 +55,64 @@ class AppConfig:
     # We switch to the standard Chat Completion endpoint which is compatible with both Ollama and OpenAI
     OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
     SETTINGS_FILE = os.path.expanduser("~/.querytune_settings.json")
+
+class HistoryManager:
+    def __init__(self):
+        self.db_path = os.path.expanduser("~/.querytune_history.db")
+        self.init_db()
+
+    def init_db(self):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        request_mode TEXT,
+                        db_type TEXT,
+                        model TEXT,
+                        query_input TEXT,
+                        context_input TEXT,
+                        result_sql TEXT,
+                        result_indices TEXT,
+                        result_explanation TEXT
+                    )
+                """)
+        except Exception as e:
+            print(f"Database error: {e}")
+
+    def save(self, mode, db_type, model, query, context, res_sql="", res_idx="", res_expl=""):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT INTO history (request_mode, db_type, model, query_input, context_input, 
+                                       result_sql, result_indices, result_explanation)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (mode, db_type, model, query, context, res_sql, res_idx, res_expl))
+        except Exception as e:
+            print(f"Failed to save history: {e}")
+
+    def get_all(self):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                return conn.execute("SELECT * FROM history ORDER BY timestamp DESC LIMIT 100").fetchall()
+        except Exception:
+            return []
+
+    def delete_item(self, item_id):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("DELETE FROM history WHERE id = ?", (item_id,))
+        except Exception as e:
+            print(f"Failed to delete item: {e}")
+
+    def clear_all(self):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("DELETE FROM history")
+        except Exception as e:
+            print(f"Failed to clear history: {e}")
 
 # System settings
 ctk.set_appearance_mode("System")
@@ -434,9 +494,10 @@ class QueryTuneApp(ctk.CTk):
 
         self.current_optimization_id = 0
         self.is_optimizing = False
+        self.history_manager = HistoryManager()
 
         self.title(f"{AppConfig.APP_NAME} - AI SQL Optimizer")
-        self.geometry("800x800")
+        self.geometry("900x850")
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -446,6 +507,7 @@ class QueryTuneApp(ctk.CTk):
         self._init_main_area()
         
         self.load_settings()
+        self.load_history_to_sidebar()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def _create_menu(self):
@@ -488,38 +550,128 @@ class QueryTuneApp(ctk.CTk):
         HelpDialog(self)
     
     def _init_sidebar(self):
-        self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(6, weight=1)
+        self.sidebar_frame.grid_rowconfigure(7, weight=1)
 
         try:
             image_path = resource_path(os.path.join("assets", "icon.png"))
-            self.logo_image = ctk.CTkImage(Image.open(image_path), size=(80, 80))
+            self.logo_image = ctk.CTkImage(Image.open(image_path), size=(60, 60))
             self.logo_image_label = ctk.CTkLabel(self.sidebar_frame, text="", image=self.logo_image)
-            self.logo_image_label.grid(row=0, column=0, padx=20, pady=(30, 0))
+            self.logo_image_label.grid(row=0, column=0, padx=20, pady=(20, 0))
         except Exception as e:
             print(f"Warning: Could not load icon: {e}")
 
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text=AppConfig.APP_NAME, font=ctk.CTkFont(size=22, weight="bold"))
-        self.logo_label.grid(row=1, column=0, padx=20, pady=(5, 20))
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text=AppConfig.APP_NAME, font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo_label.grid(row=1, column=0, padx=20, pady=(5, 10))
 
         self.db_label = ctk.CTkLabel(self.sidebar_frame, text="Database Type:", anchor="w")
         self.db_label.grid(row=2, column=0, padx=20, pady=(10, 0))
         self.db_optionemenu = ctk.CTkOptionMenu(self.sidebar_frame, values=AppConfig.DB_OPTIONS)
-        self.db_optionemenu.grid(row=3, column=0, padx=20, pady=10)
+        self.db_optionemenu.grid(row=3, column=0, padx=20, pady=5)
 
         self.model_label = ctk.CTkLabel(self.sidebar_frame, text="Model:", anchor="w")
         self.model_label.grid(row=4, column=0, padx=20, pady=(10, 0))
         self.model_entry = ctk.CTkComboBox(self.sidebar_frame, values=[AppConfig.DEFAULT_MODEL])
         self.model_entry.set(AppConfig.DEFAULT_MODEL)
-        self.model_entry.grid(row=5, column=0, padx=20, pady=10)
+        self.model_entry.grid(row=5, column=0, padx=20, pady=5)
+
+        # History Section
+        self.history_title = ctk.CTkLabel(self.sidebar_frame, text="Recent Activity:", font=ctk.CTkFont(weight="bold"))
+        self.history_title.grid(row=6, column=0, padx=20, pady=(20, 5), sticky="w")
+        
+        self.history_frame = ctk.CTkScrollableFrame(self.sidebar_frame, fg_color="transparent")
+        self.history_frame.grid(row=7, column=0, padx=5, pady=0, sticky="nsew")
+
+        self.clear_btn = ctk.CTkButton(self.sidebar_frame, text="Clear All History", command=self.clear_all_history,
+                                       height=24, font=ctk.CTkFont(size=11), 
+                                       fg_color="transparent", border_width=1,
+                                       text_color=("#C0392B", "#E74C3C"), border_color=("#C0392B", "#E74C3C"),
+                                       hover_color=("#FADBD8", "#442222"))
+        self.clear_btn.grid(row=8, column=0, padx=20, pady=10)
 
         self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Appearance:", anchor="w")
-        self.appearance_mode_label.grid(row=7, column=0, padx=20, pady=(10, 0))
+        self.appearance_mode_label.grid(row=9, column=0, padx=20, pady=(10, 0))
         self.appearance_mode_optionemenu = ctk.CTkOptionMenu(self.sidebar_frame, values=["Light", "Dark", "System"],
                                                                        command=self.change_appearance_mode_event)
         self.appearance_mode_optionemenu.set("System")
-        self.appearance_mode_optionemenu.grid(row=8, column=0, padx=20, pady=(10, 20))
+        self.appearance_mode_optionemenu.grid(row=10, column=0, padx=20, pady=(5, 20))
+
+
+    def load_history_to_sidebar(self):
+        # Clear current list
+        for widget in self.history_frame.winfo_children():
+            widget.destroy()
+        
+        items = self.history_manager.get_all()
+        for item in items:
+            self._add_history_card(item)
+
+    def _add_history_card(self, item):
+        card = ctk.CTkFrame(self.history_frame, fg_color=("gray90", "gray20"), corner_radius=6)
+        card.pack(fill="x", padx=5, pady=3)
+        
+        # Clickable area
+        mode_icon = "🪄" if item['request_mode'] == 'optimize' else "💬"
+        timestamp = datetime.strptime(item['timestamp'], "%Y-%m-%d %H:%M:%S").strftime("%d %b %H:%M")
+        
+        title_btn = ctk.CTkButton(card, text=f"{mode_icon} {timestamp}", 
+                                  anchor="w", fg_color="transparent", text_color=("black", "white"),
+                                  hover_color=("gray80", "gray30"), height=24,
+                                  command=lambda i=item: self.load_history_item(i))
+        title_btn.pack(side="top", fill="x", padx=2, pady=(2, 0))
+        
+        # Preview text
+        preview = (item['query_input'][:40] + "...") if len(item['query_input']) > 40 else item['query_input']
+        preview_label = ctk.CTkLabel(card, text=preview, font=ctk.CTkFont(size=10), 
+                                     text_color="gray", anchor="w")
+        preview_label.pack(side="top", fill="x", padx=10, pady=(0, 2))
+        
+        # Delete button
+        del_btn = ctk.CTkButton(card, text="×", width=20, height=20, fg_color="transparent", 
+                                hover_color="#C0392B", text_color="gray",
+                                command=lambda i=item['id']: self.delete_history_item(i))
+        del_btn.place(relx=0.9, rely=0.1, anchor="center")
+
+    def load_history_item(self, item):
+        # Populate inputs
+        self.input_text.delete("1.0", tk.END)
+        self.input_text.insert("1.0", item['query_input'])
+        
+        self.context_text.delete("1.0", tk.END)
+        self.context_text.insert("1.0", item['context_input'] or "")
+        
+        if item['context_input']:
+            self.context_switch.select()
+            self.toggle_context()
+        
+        # Populate results
+        self.output_query.delete("1.0", tk.END)
+        self.output_indices.delete("1.0", tk.END)
+        self.output_explanation.delete("1.0", tk.END)
+        
+        self.db_optionemenu.set(item['db_type'])
+        self.model_entry.set(item['model'])
+
+        if item['request_mode'] == 'optimize':
+            self.output_query.insert("1.0", item['result_sql'] or "")
+            self.output_indices.insert("1.0", item['result_indices'] or "")
+            self.output_explanation.insert("1.0", item['result_explanation'] or "")
+        else:
+            self.output_explanation.insert("1.0", item['result_explanation'] or "")
+        
+        # Always land on Analysis tab for a better summary overview
+        self.tabview.set("Analysis")
+
+    def delete_history_item(self, item_id):
+        self.history_manager.delete_item(item_id)
+        self.load_history_to_sidebar()
+
+    def clear_all_history(self):
+        if messagebox.askyesno("Confirm", "Clear all history?"):
+            self.history_manager.clear_all()
+            self.load_history_to_sidebar()
+
 
     def _init_main_area(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
@@ -552,7 +704,7 @@ class QueryTuneApp(ctk.CTk):
         self.context_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         # Don't grid it yet, toggle_context handles it
         
-        self.context_label = ctk.CTkLabel(self.context_frame, text="Additional Context (Table sizes, constraints, specific instructions):", anchor="w")
+        self.context_label = ctk.CTkLabel(self.context_frame, text="Additional Context (DDL, table sizes, specific instructions):", anchor="w")
         self.context_label.pack(fill="x", pady=(5,0))
         self.context_text = ctk.CTkTextbox(self.context_frame, height=80, font=(AppConfig.FONT_SANS, 12))
         self.context_text.pack(fill="x", pady=5)
@@ -785,6 +937,11 @@ class QueryTuneApp(ctk.CTk):
         if not query:
             return
 
+        self.last_query = query
+        self.last_context = context
+        self.last_mode = mode
+        self.full_response_content = "" # For streaming chat
+
         self.optimize_button.configure(state="disabled")
         self.explain_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
@@ -901,9 +1058,21 @@ class QueryTuneApp(ctk.CTk):
                                 token = json_chunk.get("response", "")
                                 
                             if token:
+                                self.full_response_content += token
                                 self.after(0, lambda t=token: self.stream_token(t, req_id))
                         except:
                             pass
+                
+                # Save chat to history
+                self.history_manager.save(
+                    mode="explain",
+                    db_type=db_type,
+                    model=model,
+                    query=query,
+                    context=context,
+                    res_expl=self.full_response_content
+                )
+                self.after(0, self.load_history_to_sidebar)
                 self.after(0, self.finalize_task)
             
             else:
@@ -997,8 +1166,23 @@ class QueryTuneApp(ctk.CTk):
         self.output_indices.insert("1.0", formatted_indices if formatted_indices else "None")
         
         # 3. Explanation
-        self.output_explanation.insert("1.0", content.get("explanation", "No explanation provided"))
+        expl = content.get("explanation", "No explanation provided")
+        self.output_explanation.insert("1.0", expl)
+
+        # Save to history
+        self.history_manager.save(
+            mode="optimize",
+            db_type=self.db_optionemenu.get(),
+            model=self.model_entry.get(),
+            query=self.last_query,
+            context=self.last_context,
+            res_sql=formatted_sql,
+            res_idx=formatted_indices,
+            res_expl=expl
+        )
+        self.after(0, self.load_history_to_sidebar)
         self.finalize_task()
+
 
     def show_error(self, error_msg):
         self.output_explanation.delete("1.0", tk.END)
