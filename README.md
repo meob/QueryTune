@@ -24,13 +24,6 @@ QueryTune uses the native MacOS user inferface. One picture is worth a thousand 
 
 In Chat Mode QueryTune can describe the results in any language the LLM knows.
 
-## 🛠 Technical Stack
-
-- **Language:** Python 3.13
-- **GUI Framework:** [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
-- **AI Backend:** OpenAI-compatible API (Ollama v1, OpenAI API, etc.)
-- **Packaging:** PyInstaller + `create-dmg`
-
 ## 📦 Getting Started
 
 ### Prerequisites
@@ -43,6 +36,10 @@ In Chat Mode QueryTune can describe the results in any language the LLM knows.
     ```
     brew install python@3.13 python-tk@3.13
     ```
+3.  **Install QueryTune:**
+
+    Download the ```QueryTune.dmg``` file from [GitHub](https://github.com/meob/QueryTune/releases)
+    Install QueryTune on you Mac with a doubleclick on the .dmg file.
 
 ### Development Setup
 
@@ -109,14 +106,31 @@ Choosing the right LLM is crucial for high-quality optimizations. Below are the 
 *   **Context Window**: For long or complex queries, prefer models with at least **32k context** (like Qwen 2.5/3 or Claude) to avoid the "lost in the middle" effect where the AI forgets the beginning of the prompt. The context lenght can be modified in Settings.
 *   **Model Choice**: Use local models (`7b` to `14b`) for privacy and speed on standard tasks. Switch to "Cloud" or larger reasoning models (`DeepSeek-R1` or `Qwen3-Next`) for architectural refactoring and multi-page complex queries. **Only local models guarantee complete privacy**. 
 
+
+## 🛠 Technical Stack
+
+- **Language:** Python 3.13
+- **GUI Framework:** [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
+- **AI Backend:** OpenAI-compatible API (Ollama v1, OpenAI API, etc.)
+- **Packaging:** PyInstaller + `create-dmg`
+
+
+### 🧠 Development Notes
+
+This project was developed through iterative collaboration with generative AI tools. AI assistance was used for implementation, refactoring, and debugging, while overall design decisions, validation, and final integration were performed by the author.
+
 ---
 
 ## 🏗 Roadmap
 
 - [x] **History Log:** Save and browse previous optimizations.
-- [ ] **DDL Integration:** Automatic schema parsing from SQL files to provide even more context. (NB The context window seems enough)
+- [x] **Windows Support:** Cross-platform builds via GitHub Actions.
 - [ ] **Visual Diff:** Side-by-side comparison between original and optimized queries.
-- [ ] **Database connection:** Online DB connection to gather more information. 
+- [ ] **Database connection:** Online DB connection to gather more information. (NB Maybe it is an overengineering)
+- [ ] **DDL Integration:** Automatic schema parsing from SQL files to provide even more context. (NB The context window seems enough)
+- [ ] **Linux support.** (NB Maybe in a different project)
+
+
 
 ## 📄 License
 

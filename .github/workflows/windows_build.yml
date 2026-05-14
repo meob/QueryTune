@@ -1,0 +1,73 @@
+name: Build Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller pyinstaller-versionfile
+
+    - name: Create Version File
+      run: |
+        echo "import pyinstaller_versionfile
+        pyinstaller_versionfile.create_versionfile(
+            output_file='versionfile.txt',
+            version='0.1.0.0',
+            company_name='QueryTune',
+            file_description='AI SQL Optimizer',
+            internal_name='QueryTune',
+            legal_copyright='Apache License 2.0',
+            original_filename='QueryTune.exe',
+            product_name='QueryTune'
+        )" > create_version.py
+        python create_version.py
+
+    - name: Build with PyInstaller
+      run: |
+        $CTK_PATH = python -c "import customtkinter; print(customtkinter.__path__[0])"
+        pyinstaller --noconfirm --onedir --windowed `
+          --add-data "assets;assets" `
+          --add-data "$($CTK_PATH);customtkinter" `
+          --name "QueryTune" `
+          --version-file "versionfile.txt" `
+          "main.py"
+
+    - name: Create MSI Installer (optional but recommended)
+      shell: pwsh
+      run: |
+        # Simply zipping the dist folder as a first step, 
+        # actual MSI creation would require Wix Toolset or similar.
+        Compress-Archive -Path dist/QueryTune/* -DestinationPath dist/QueryTune_Windows_Portable.zip
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: QueryTune-Windows
+        path: dist/QueryTune_Windows_Portable.zip
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/QueryTune_Windows_Portable.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

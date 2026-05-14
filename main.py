@@ -13,7 +13,7 @@ from datetime import datetime
 import webbrowser
 from PIL import Image
 
-# Patch for macOS version detection issues on newer/beta releases (e.g., Sequoia, Tahoe)
+# Patch for macOS version detection issues on newer/beta releases
 if platform.system() == "Darwin":
     os.environ['SYSTEM_VERSION_COMPAT'] = '0'
 
@@ -29,7 +29,7 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.1.0"
+    VERSION = "0.2.0"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
@@ -38,9 +38,11 @@ class AppConfig:
     AI_CTX_SIZE = 8192
     DEFAULT_SYSTEM_PROMPT_CHAT = "You are an expert {db_type} DBA. Explain the query and suggest improvements. Reply in English."
     
-    # UI 
-    FONT_MONO = "Menlo"
-    FONT_SANS = "Arial"
+    # UI - Cross Platform Fonts
+    IS_MAC = platform.system() == "Darwin"
+    FONT_MONO = "Menlo" if IS_MAC else "Consolas"
+    FONT_SANS = "Arial" if IS_MAC else "Segoe UI"
+    
     SIZE_QUERY = 10      # Smaller for long queries
     SIZE_INDICES = 12    # Standard mono
     SIZE_EXPLANATION = 16 # Larger for readability
