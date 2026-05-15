@@ -29,7 +29,7 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.2.2"
+    VERSION = "0.2.3"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
