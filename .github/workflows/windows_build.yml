@@ -31,7 +31,7 @@ jobs:
         echo "import pyinstaller_versionfile
         pyinstaller_versionfile.create_versionfile(
             output_file='versionfile.txt',
-            version='0.1.0.0',
+            version='0.2.4.0',
             company_name='QueryTune',
             file_description='AI SQL Optimizer',
             internal_name='QueryTune',
@@ -42,11 +42,12 @@ jobs:
         python create_version.py
 
     - name: Build with PyInstaller
+      shell: pwsh
       run: |
         $CTK_PATH = python -c "import customtkinter; print(customtkinter.__path__[0])"
         pyinstaller --noconfirm --onedir --windowed `
           --add-data "assets;assets" `
-          --add-data "$($CTK_PATH);customtkinter" `
+          --add-data "${CTK_PATH};customtkinter" `
           --name "QueryTune" `
           --version-file "versionfile.txt" `
           "main.py"
