@@ -29,7 +29,7 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.2.1"
+    VERSION = "0.2.2"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
@@ -37,6 +37,10 @@ class AppConfig:
     AI_TEMPERATURE = 0.1
     AI_CTX_SIZE = 8192
     DEFAULT_SYSTEM_PROMPT_CHAT = "You are an expert {db_type} DBA. Explain the query and suggest improvements. Reply in English."
+    
+    # Links
+    URL_DOCS = "https://meob.github.io/QueryTune/"
+    URL_GITHUB = "https://github.com/meob/QueryTune"
     
     # UI - Cross Platform Fonts
     IS_MAC = platform.system() == "Darwin"
@@ -476,7 +480,7 @@ class HelpDialog(ctk.CTkToplevel):
                                       font=ctk.CTkFont(size=13, underline=True),
                                       anchor="w")
         self.link_label.pack(fill="x", padx=15, pady=(0, 15))
-        self.link_label.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/meob/QueryTune"))
+        self.link_label.bind("<Button-1>", lambda e: webbrowser.open(AppConfig.URL_GITHUB))
 
         self.btn_close = ctk.CTkButton(self, text="Close", command=self.destroy)
         self.btn_close.grid(row=1, column=0, pady=(0, 20))
@@ -554,11 +558,12 @@ class QueryTuneApp(ctk.CTk):
             "About QueryTune",
             f"{AppConfig.APP_NAME}\nVersion {AppConfig.VERSION}\n\n"
             "An AI-powered SQL optimizer using local LLMs.\n"
-            "Powered by Ollama & CustomTkinter."
+            "Powered by Ollama & CustomTkinter.\n\n"
+            "Official Website:\nhttps://meob.github.io/QueryTune/"
         )
 
     def show_help(self):
-        HelpDialog(self)
+        webbrowser.open(AppConfig.URL_DOCS)
     
     def _init_sidebar(self):
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
