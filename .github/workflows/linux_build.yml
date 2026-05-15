@@ -1,0 +1,60 @@
+name: Build Linux Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-tk
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        CTK_PATH=$(python -c "import customtkinter; print(customtkinter.__path__[0])")
+        pyinstaller --noconfirm --onefile --windowed \
+          --add-data "assets:assets" \
+          --add-data "${CTK_PATH}:customtkinter" \
+          --name "QueryTune_Linux" \
+          "main.py"
+
+    - name: Create Tarball
+      run: |
+        cd dist
+        tar -czvf QueryTune_Linux_Portable.tar.gz QueryTune_Linux
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: QueryTune-Linux
+        path: dist/QueryTune_Linux_Portable.tar.gz
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/QueryTune_Linux_Portable.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

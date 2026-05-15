@@ -1,7 +1,8 @@
 # QueryTune
 
 ![Logo](assets/icon_64.png) QueryTune is a native macOS application designed to optimize SQL queries using Large Language Models (LLMs). It supports both **local models** (via Ollama) and **cloud services** (OpenAI API compatible), providing developers and DBAs with a powerful tool to refactor SQL code, suggest indices, and improve database performance.
-
+QueryTune is available on Windows, Linux too.
+ 
 ## 🚀 Features
 
 - **Dual Analysis Modes:**
@@ -14,15 +15,13 @@
 - **Settings Persistence:** Remembers your preferred Model, Database Type, Theme, API Keys, and Font settings.
 - **Advanced SQL Formatting:** Customize indentation, keyword casing, and styling (comma-first, compact SELECT).
 - **Connection Diagnostics:** Test your AI endpoint directly from the settings menu.
-- **Native macOS Experience:** Clean interface with dark mode support, native menus (About/Preferences), and optimized build for Apple Silicon and Intel.
+- **Cross-Platform Experience:** Optimized for macOS (native menus), Windows (standard UI), and Linux (AppImage/Binary).
 
-## 🖥️ Graphical User Interface
+## 🖥️ User Interface
 
-QueryTune uses the native MacOS user inferface. One picture is worth a thousand words:
+QueryTune provides a consistent experience across all major operating systems.
 
 <img alt="QueryTune User Interface" src="assets/QTune_UI.webp" width="50%">
-
-In Chat Mode QueryTune can describe the results in any language the LLM knows.
 
 ## 📦 Getting Started
 
@@ -31,15 +30,18 @@ In Chat Mode QueryTune can describe the results in any language the LLM knows.
 1.  **AI Provider:** 
     - **Local:** Install [Ollama](https://ollama.com/) and pull a model (e.g., `ollama pull qwen2.5-coder:7b`).
     - **Cloud:** Obtain an API Key from [OpenAI](https://platform.openai.com/).
-2.  **Python & Tkinter:**
+2.  **System Requirements:**
 
-    ```
-    brew install python@3.13 python-tk@3.13
-    ```
+    - **macOS:** `brew install python@3.13 python-tk@3.13`
+    - **Windows:** Install Python 3.13 from [python.org](https://www.python.org/).
+    - **Linux:** `sudo apt install python3-tk` (or equivalent for your distro).
+
 3.  **Install QueryTune:**
 
-    Download the ```QueryTune.dmg``` file from [GitHub](https://github.com/meob/QueryTune/releases)
-    Install QueryTune on you Mac with a doubleclick on the .dmg file.
+    Download the latest version for your platform from [GitHub Releases](https://github.com/meob/QueryTune/releases):
+    - **macOS:** `.dmg` installer.
+    - **Windows:** `.zip` portable package (exe).
+    - **Linux:** `.tar.gz` portable binary.
 
 ### Development Setup
 
@@ -124,11 +126,10 @@ This project was developed through iterative collaboration with generative AI to
 ## 🏗 Roadmap
 
 - [x] **History Log:** Save and browse previous optimizations.
-- [x] **Windows Support:** Cross-platform builds via GitHub Actions.
+- [x] **Windows & Linux Support:** Cross-platform builds via GitHub Actions.
 - [ ] **Visual Diff:** Side-by-side comparison between original and optimized queries.
 - [ ] **Database connection:** Online DB connection to gather more information. (NB Maybe it is an overengineering)
 - [ ] **DDL Integration:** Automatic schema parsing from SQL files to provide even more context. (NB The context window seems enough)
-- [ ] **Linux support.** (NB Maybe in a different project)
 
 
 

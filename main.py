@@ -29,7 +29,7 @@ def resource_path(relative_path):
 # --- Configuration ---
 class AppConfig:
     APP_NAME = "QueryTune"
-    VERSION = "0.2.0"
+    VERSION = "0.2.1"
     DEFAULT_MODEL = "qwen2.5-coder:7b"
     TIMEOUT = 180
     
@@ -40,8 +40,17 @@ class AppConfig:
     
     # UI - Cross Platform Fonts
     IS_MAC = platform.system() == "Darwin"
-    FONT_MONO = "Menlo" if IS_MAC else "Consolas"
-    FONT_SANS = "Arial" if IS_MAC else "Segoe UI"
+    IS_WIN = platform.system() == "Windows"
+    
+    if IS_MAC:
+        FONT_MONO = "Menlo"
+        FONT_SANS = "Arial"
+    elif IS_WIN:
+        FONT_MONO = "Consolas"
+        FONT_SANS = "Segoe UI"
+    else: # Linux and others
+        FONT_MONO = "Ubuntu Mono"
+        FONT_SANS = "Ubuntu"
     
     SIZE_QUERY = 10      # Smaller for long queries
     SIZE_INDICES = 12    # Standard mono
