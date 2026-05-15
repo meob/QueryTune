@@ -14,5 +14,6 @@ dist/
 .DS_Store
 *.icns
 
-# doc
+# doc staff
 doc/
+staff/

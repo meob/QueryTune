@@ -2,17 +2,17 @@
 
 ![Logo](assets/icon_64.png) QueryTune is a native macOS application designed to optimize SQL queries using Large Language Models (LLMs).
 
-📖 **[Read the Official Documentation](https://meob.github.io/QueryTune/)**
-
 It supports both **local models** (via Ollama) and **cloud services** (OpenAI API compatible), providing developers and DBAs with a powerful tool to refactor SQL code, suggest indices, and improve database performance.
 
 QueryTune is available on Windows, Linux too.
+
+📖 **[Read the Official Documentation](https://meob.github.io/QueryTune/)**
  
 ## 🚀 Features
 
 - **Dual Analysis Modes:**
+  - **Chat Mode:** Provides a conversational, real-time streaming experience with responses appearing immediately word-by-word for general query analysis and brainstorming.
   - **Optimize:** Generates structured results including a refactored query, index suggestions, and technical explanations.
-  - **Chat Mode:** Provides a conversational, streaming experience (word-by-word) for general query analysis and brainstorming.
 - **Context Awareness:** Add specific instructions, table sizes, or schema details in the collapsible "Context" area to improve AI accuracy.
 - **Hybrid AI Processing:** 
   - **Local:** Connects to your local Ollama instance (100% private).

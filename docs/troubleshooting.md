@@ -1,4 +1,4 @@
-# Setup & Troubleshooting
+# ![Logo](icon_64.png) Setup & Troubleshooting
 
 ## Connecting an AI Provider
 
@@ -16,7 +16,14 @@ QueryTune doesn't include an LLM; it connects to a provider of your choice.
 3.  Enter your **API Key**.
 4.  Enter the exact **Model Name** (e.g., `gpt-4o`).
 
+> There are several QueryTune parameters you can change. 
+> Do you want QueryTune replies in your language? Modify the Chat Prompt in Settings, System Prompt
+
+
 ## Common Issues
+
+### "It takes a long time..."
+*   **Optimize Mode:** When QueryTune is used in Optimize Mode it has to finish the whole conversation with AI and this can take a couple of minutes. For a real-time experience use **Chat Mode**.
 
 ### "Connection Error"
 *   **Local:** Is Ollama running? Can you access `http://localhost:11434` in your browser?
